@@ -6,11 +6,12 @@
 class gxFont;
 class gxGraphics;
 
-typedef IDirectDrawSurface7 ddSurf;
+typedef IDirect3DSurface9 ddSurf;
+//typedef IDirect3DTexture9 ddText; // Placeholder
 
 class gxCanvas {
 public:
-	gxCanvas(gxGraphics* g, IDirectDrawSurface7* s, int f);
+	gxCanvas(gxGraphics* g, IDirect3DSurface9* s, int f);
 	~gxCanvas();
 
 	void backup()const;

@@ -6,7 +6,7 @@
 
 #include <set>
 #include <string>
-#include <d3d.h>
+#include <d3d9.h>
 
 #include "ddutil.h"
 
@@ -20,21 +20,21 @@ class gxRuntime;
 
 class gxGraphics {
 public:
-	IDirectDraw7* dirDraw;
+	IDirect3D9* dirDraw;
 	IDirectDraw* ds_dirDraw;
 
-	IDirect3D7* dir3d;
-	IDirect3DDevice7* dir3dDev;
-	D3DDEVICEDESC7 dir3dDevDesc;
-	DDPIXELFORMAT primFmt, zbuffFmt;
+	IDirect3D9* dir3d;
+	IDirect3DDevice9* dir3dDev;
+	D3DCAPS9 dir3dDevDesc;
+	D3DFORMAT primFmt, zbuffFmt;
 
-	DDPIXELFORMAT texRGBFmt[2], texAlphaFmt[2], texRGBAlphaFmt[2], texRGBMaskFmt[2];
+	D3DFORMAT texRGBFmt[2], texAlphaFmt[2], texRGBAlphaFmt[2], texRGBMaskFmt[2];
 
 	FT_Library ftLibrary;
 
 	bool running_on_wine;
 
-	gxGraphics(gxRuntime* runtime, IDirectDraw7* dirDraw, IDirectDrawSurface7* front, IDirectDrawSurface7* back, bool d3d);
+	gxGraphics(gxRuntime* runtime, IDirect3D9* dirDraw, IDirect3DSurface9* front, IDirect3DSurface9* back, bool d3d);
 	~gxGraphics();
 
 	bool restore();
@@ -56,7 +56,7 @@ private:
 	std::set<gxMovie*> movie_set;
 	std::set<std::string> font_res;
 
-	DDGAMMARAMP _gammaRamp;
+	D3DGAMMARAMP _gammaRamp;
 	IDirectDrawGammaControl* _gamma;
 
 	/***** GX INTERFACE *****/
@@ -66,7 +66,8 @@ public:
 		GRAPHICS_SCALED = 2,		//scaled window
 		GRAPHICS_3D = 4,			//3d mode! Hurrah!
 		GRAPHICS_AUTOSUSPEND = 8,	//suspend graphics when app suspended
-		GRAPHICS_BORDERLESS = 16
+		GRAPHICS_BORDERLESS = 16,
+		GRAPHICS_HIDEWINDOW = 32
 	};
 
 	//MANIPULATORS

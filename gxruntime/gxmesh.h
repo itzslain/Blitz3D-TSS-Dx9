@@ -1,14 +1,14 @@
 #ifndef GXMESH_H
 #define GXMESH_H
 
-#include <d3d.h>
+#include <d3d9.h>
 
 class gxGraphics;
 
 class gxMesh {
 public:
 
-	gxMesh(gxGraphics* graphics, IDirect3DVertexBuffer7* verts, WORD* indicies, int max_verts, int max_tris);
+	gxMesh(gxGraphics* graphics, IDirect3DVertexBuffer9* verts, WORD* indicies, int max_verts, int max_tris);
 	~gxMesh();
 
 	int maxVerts()const { return max_verts; }
@@ -30,7 +30,8 @@ private:
 	};
 
 	gxGraphics* graphics;
-	IDirect3DVertexBuffer7* vertex_buff;
+	IDirect3DVertexBuffer9* vertex_buff;
+	IDirect3DIndexBuffer9* index_buff;
 	WORD* tri_indices;
 
 	int max_verts, max_tris;

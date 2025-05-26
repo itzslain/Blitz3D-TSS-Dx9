@@ -141,12 +141,12 @@ gxRuntime::gxRuntime(HINSTANCE hi, const std::string& cl, HWND hw) :
 	statex.dwLength = sizeof(statex);
 	GlobalMemoryStatusEx(&statex);
 
-	HMODULE ddraw = LoadLibraryA("ddraw.dll");
+	/*HMODULE ddraw = LoadLibraryA("ddraw.dll");
 	if(ddraw) {
 		SetAppCompatDataFunc SetAppCompatData = (SetAppCompatDataFunc)GetProcAddress(ddraw, "SetAppCompatData");
 		if(SetAppCompatData) SetAppCompatData(12, 0);
 		FreeLibrary(ddraw);
-	}
+	}*/
 
 	memset(&devmode, 0, sizeof(devmode));
 	devmode.dmSize = sizeof(devmode);
@@ -404,7 +404,9 @@ LRESULT gxRuntime::windowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
 
-	static const int MK_ALLBUTTONS = MK_LBUTTON | MK_RBUTTON | MK_MBUTTON;
+	static const int MK_ALLBUTTONS = MK_LBUTTON | MK_RBUTTON | MK_MBUTTON | MK_XBUTTON1 | MK_XBUTTON2;
+
+	UINT button = GET_XBUTTON_WPARAM(wparam);
 
 	//handle input messages
 	switch(msg) {
@@ -428,19 +430,21 @@ LRESULT gxRuntime::windowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			input->wm_mousedown(3);
 			SetCapture(hwnd);
 			break;
-		case WM_XBUTTONDOWN:
-			if (HIWORD(wparam) == XBUTTON1) input->wm_mousedown(5); // don't ask me why
-			else if (HIWORD(wparam) == XBUTTON2) input->wm_mousedown(4);
-			SetCapture(hwnd);
-			break;
-		case WM_XBUTTONUP:
-			if (HIWORD(wparam) == XBUTTON1) input->wm_mouseup(5);
-			else if (HIWORD(wparam) == XBUTTON2) input->wm_mouseup(4);
-			if (!(wparam & MK_ALLBUTTONS)) ReleaseCapture();
-			break;
 		case WM_MBUTTONUP:
 			input->wm_mouseup(3);
 			if(!(wparam & MK_ALLBUTTONS)) ReleaseCapture();
+			break;
+		case WM_XBUTTONDOWN:
+			if (button == XBUTTON1) input->wm_mousedown(4);
+			else if (button == XBUTTON2) input->wm_mousedown(5);
+
+			SetCapture(hwnd);
+			break;
+		case WM_XBUTTONUP:
+			if (button == XBUTTON1) input->wm_mouseup(4);
+			else if (button == XBUTTON2) input->wm_mouseup(5);
+
+			if (!(wparam & MK_ALLBUTTONS)) ReleaseCapture();
 			break;
 		case WM_MOUSEMOVE:
 			if(!graphics) break;
@@ -910,45 +914,51 @@ gxGraphics* gxRuntime::openGraphics(int w, int h, int d, int driver, int flags) 
 				hh = h;
 			}
 
-			if(border_mode == 1) {
-				SetWindowLong(hwnd, GWL_STYLE, WS_POPUP);
-				SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_SHOWWINDOW);
-			}
-			else {
-				SetWindowLong(hwnd, GWL_STYLE, ws);
-				SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-			}
+			if (!(flags & gxGraphics::GRAPHICS_HIDEWINDOW))
+			{
+				if (border_mode == 1) {
+					SetWindowLong(hwnd, GWL_STYLE, WS_POPUP);
+					SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_SHOWWINDOW);
+				}
+				else {
+					SetWindowLong(hwnd, GWL_STYLE, ws);
+					SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+				}
 
-			RECT w_r, c_r;
-			GetWindowRect(hwnd, &w_r);
-			GetClientRect(hwnd, &c_r);
-			int tw = (w_r.right - w_r.left) - (c_r.right - c_r.left);
-			int th = (w_r.bottom - w_r.top) - (c_r.bottom - c_r.top);
-			int cx = (GetSystemMetrics(SM_CXSCREEN) - ww) / 2;
-			int cy = (GetSystemMetrics(SM_CYSCREEN) - hh) / 2;
-			POINT zz = { 0,0 };
-			ClientToScreen(hwnd, &zz);
-			int bw = zz.x - w_r.left, bh = zz.y - w_r.top;
-			int wx = cx - bw, wy = cy - bh; if(wy < 0) wy = 0;		//not above top!
-			MoveWindow(hwnd, wx, wy, ww + tw, hh + th, true);
+				RECT w_r, c_r;
+				GetWindowRect(hwnd, &w_r);
+				GetClientRect(hwnd, &c_r);
+				int tw = (w_r.right - w_r.left) - (c_r.right - c_r.left);
+				int th = (w_r.bottom - w_r.top) - (c_r.bottom - c_r.top);
+				int cx = (GetSystemMetrics(SM_CXSCREEN) - ww) / 2;
+				int cy = (GetSystemMetrics(SM_CYSCREEN) - hh) / 2;
+				POINT zz = { 0,0 };
+				ClientToScreen(hwnd, &zz);
+				int bw = zz.x - w_r.left, bh = zz.y - w_r.top;
+				int wx = cx - bw, wy = cy - bh; if (wy < 0) wy = 0;		//not above top!
+				MoveWindow(hwnd, wx, wy, ww + tw, hh + th, true);
+			}
 		}
 	}
 	else {
 		backupWindowState();
 
-		SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_POPUP);
-		SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+		if (!(flags & gxGraphics::GRAPHICS_HIDEWINDOW))
+		{
+			SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_POPUP);
+			SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
-		ShowCursor(0);
-		if(graphics = openExclusiveGraphics(w, h, d, d3d)) {
-			gfx_mode = GMODE_EXCLUSIVE;
-			auto_suspend = true;
-			SetCursorPos(0, 0);
-			acquireInput();
-		}
-		else {
-			ShowCursor(1);
-			restoreWindowState();
+			ShowCursor(0);
+			if (graphics = openExclusiveGraphics(w, h, d, d3d)) {
+				gfx_mode = GMODE_EXCLUSIVE;
+				auto_suspend = true;
+				SetCursorPos(0, 0);
+				acquireInput();
+			}
+			else {
+				ShowCursor(1);
+				restoreWindowState();
+			}
 		}
 	}
 

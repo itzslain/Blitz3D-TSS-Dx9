@@ -72,6 +72,8 @@ private:
 	void acquireInput();
 	void unacquireInput();
 
+	int endCallback;
+
 	/***** APP INTERFACE *****/
 public:
 	static gxRuntime* openRuntime(HINSTANCE hinst, const std::string& cmd_line, Debugger* debugger);

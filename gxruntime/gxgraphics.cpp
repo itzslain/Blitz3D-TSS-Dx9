@@ -6,7 +6,7 @@
 extern gxRuntime* gx_runtime;
 static Debugger* debugger;
 
-gxGraphics::gxGraphics(gxRuntime* rt, IDirectDraw7* dd, IDirectDrawSurface7* fs, IDirectDrawSurface7* bs, bool d3d) :
+gxGraphics::gxGraphics(gxRuntime* rt, IDirect3D9* dd, IDirect3DSurface9* fs, IDirect3DSurface9* bs, bool d3d) :
 	runtime(rt), dirDraw(dd), dir3d(0), dir3dDev(0), gfx_lost(false), dummy_mesh(0) {
 	dirDraw->QueryInterface(IID_IDirectDraw, (void**)&ds_dirDraw);
 
@@ -83,7 +83,7 @@ void gxGraphics::setGamma(int r, int g, int b, float dr, float dg, float db) {
 
 void gxGraphics::updateGamma(bool calibrate) {
 	if (!_gamma) return;
-	_gamma->SetGammaRamp(calibrate ? DDSGR_CALIBRATE : 0, &_gammaRamp);
+	_gamma->SetGammaRamp(calibrate ? D3DSGR_CALIBRATE : D3DSGR_NO_CALIBRATION, &_gammaRamp);
 }
 
 void gxGraphics::getGamma(int r, int g, int b, float* dr, float* dg, float* db) {
@@ -116,7 +116,7 @@ bool gxGraphics::restore() {
 	for (mesh_it = mesh_set.begin(); mesh_it != mesh_set.end(); ++mesh_it) {
 		(*mesh_it)->restore();
 	}
-	if (dir3d) dir3d->EvictManagedTextures();
+	if (dir3d) dir3dDev->EvictManagedResources();
 
 	return true;
 }
@@ -274,36 +274,38 @@ void gxGraphics::freeFont(gxFont* f) {
 
 static int maxDevType;
 
-static HRESULT CALLBACK enumDevice(char* desc, char* name, D3DDEVICEDESC7* devDesc, void* context) {
+static HRESULT CALLBACK enumDevice(D3DADAPTER_IDENTIFIER9* adapter, D3DDISPLAYMODE* displayMode, void* context) {
 	gxGraphics* g = (gxGraphics*)context;
+	D3DCAPS9 caps;
+	g->dir3dDev->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &caps);
+
 	int t = 0;
-	GUID guid = devDesc->deviceGUID;
-	if (guid == IID_IDirect3DRGBDevice) t = 1;
-	else if (guid == IID_IDirect3DHALDevice) t = 2;
-	else if (guid == IID_IDirect3DTnLHalDevice) t = 3;
+	if (caps.DeviceType == D3DDEVTYPE_REF) t = 1;
+	else if (caps.DeviceType == D3DDEVTYPE_HAL) t = 2;
+	else if (caps.DeviceType == D3DDEVTYPE_SW) t = 3;
 	if (t > maxDevType) {
-		g->dir3dDevDesc = *devDesc;
+		g->dir3dDevDesc = caps;
 		maxDevType = t;
 	}
-	return D3DENUMRET_OK;
+	return 1;
 }
 
 static HRESULT CALLBACK enumZbuffFormat(LPDDPIXELFORMAT format, void* context) {
 	gxGraphics* g = (gxGraphics*)context;
 	if (format->dwZBufferBitDepth == g->primFmt.dwRGBBitCount) {
 		g->zbuffFmt = *format;
-		return D3DENUMRET_CANCEL;
+		return 0;
 	}
 	if (format->dwZBufferBitDepth > g->zbuffFmt.dwZBufferBitDepth) {
 		if (format->dwZBufferBitDepth < g->primFmt.dwRGBBitCount) {
 			g->zbuffFmt = *format;
 		}
 	}
-	return D3DENUMRET_OK;
+	return 1;
 }
 
 struct TexFmt {
-	DDPIXELFORMAT fmt;
+	D3DFORMAT fmt;
 	int bits, a_bits, rgb_bits;
 };
 
@@ -317,7 +319,7 @@ static int cntBits(int mask) {
 
 static std::vector<TexFmt> tex_fmts;
 
-static HRESULT CALLBACK enumTextureFormat(DDPIXELFORMAT* fmt, void* p) {
+static HRESULT CALLBACK enumTextureFormat(D3DFORMAT* fmt, void* p) {
 	TexFmt t;
 	t.fmt = *fmt;
 	t.bits = fmt->dwRGBBitCount;
@@ -326,7 +328,7 @@ static HRESULT CALLBACK enumTextureFormat(DDPIXELFORMAT* fmt, void* p) {
 
 	tex_fmts.push_back(t);
 
-	return D3DENUMRET_OK;
+	return 1;
 }
 
 static std::string itobin(int n) {
@@ -338,7 +340,7 @@ static std::string itobin(int n) {
 }
 
 #ifdef BETA
-static void debugPF(const DDPIXELFORMAT& pf) {
+static void debugPF(const D3DFORMAT& pf) {
 	string t;
 	t = "Bits:" + itoa(pf.dwRGBBitCount);
 	gx_runtime->debugLog(t.c_str());
@@ -422,7 +424,7 @@ gxScene* gxGraphics::createScene(int flags) {
 	if (scene_set.size()) return 0;
 
 	//get d3d
-	if (dirDraw->QueryInterface(IID_IDirect3D7, (void**)&dir3d) >= 0) {
+	if (dirDraw->QueryInterface(IID_IDirect3D9, (void**)&dir3d) >= 0) {
 		//enum devices
 		maxDevType = 0;
 		if (dir3d->EnumDevices(enumDevice, this) >= 0 && maxDevType > 1) {
@@ -432,10 +434,10 @@ gxScene* gxGraphics::createScene(int flags) {
 				//create zbuff for back buffer
 				if (back_canvas->attachZBuffer()) {
 					//create 3d device
-					if (dir3d->CreateDevice(dir3dDevDesc.deviceGUID, back_canvas->getSurface(), &dir3dDev) >= 0) {
+					if (dir3d->CreateDevice(dir3dDevDesc.deviceGUID, back_canvas->getSurface(), &dir3d) >= 0) {
 						//enum texture formats
 						tex_fmts.clear();
-						if (dir3dDev->EnumTextureFormats(enumTextureFormat, this) >= 0) {
+						if (dir3d->CheckDeviceFormat(enumTextureFormat, this) >= 0) {
 							pickTexFmts(this, 0);
 							pickTexFmts(this, 1);
 							tex_fmts.clear();
@@ -493,17 +495,11 @@ gxMesh* gxGraphics::createMesh(int max_verts, int max_tris, int flags) {
 		D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2 |
 		D3DFVF_TEXCOORDSIZE2(0) | D3DFVF_TEXCOORDSIZE2(1);
 
-	int vbflags = 0;
+	UINT vertexSize = D3DXGetFVFVertexSize(VTXFMT);
+	UINT bufferSize = max_verts * vertexSize;
 
-	//XP or less?
-	if (runtime->osinfo.dwMajorVersion < 6) {
-		vbflags |= D3DVBCAPS_WRITEONLY;
-	}
-
-	D3DVERTEXBUFFERDESC desc = { sizeof(desc),vbflags,VTXFMT,max_verts };
-
-	IDirect3DVertexBuffer7* buff;
-	if (dir3d->CreateVertexBuffer(&desc, &buff, 0) < 0) return 0;
+	IDirect3DVertexBuffer9* buff;
+	if (dir3dDev->CreateVertexBuffer(bufferSize, D3DUSAGE_WRITEONLY, VTXFMT, D3DPOOL_MANAGED, &buff, NULL) < 0) return 0;
 	WORD* indices = new WORD[max_tris * 3];
 	gxMesh* mesh = new gxMesh(this, buff, indices, max_verts, max_tris);
 	mesh_set.insert(mesh);

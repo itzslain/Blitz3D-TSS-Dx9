@@ -22,60 +22,67 @@ void gxScene::setTSS(int n, int s, int t) {
 	d3d_tss[n][s] = t;
 }
 
+void gxScene::setSAMP(int n, D3DSAMPLERSTATETYPE s, int t) {
+	if (d3d_samp[n][s] == t) return;
+	dir3dDev->SetSamplerState(n, s, t);
+	d3d_samp[n][s] = t;
+}
+
 gxScene::gxScene(gxGraphics* g, gxCanvas* t) :
 	graphics(g), target(t), dir3dDev(g->dir3dDev),
 	n_texs(0), tris_drawn(0) {
 
 	memset(d3d_rs, 0x55, sizeof(d3d_rs));
 	memset(d3d_tss, 0x55, sizeof(d3d_tss));
+	memset(d3d_samp, 0x55, sizeof(d3d_samp));
 
 	//nomalize normals
-	setRS(D3DRENDERSTATE_NORMALIZENORMALS, TRUE);
+	setRS(D3DRS_NORMALIZENORMALS, TRUE);
 
 	//vertex coloring
-	setRS(D3DRENDERSTATE_COLORVERTEX, FALSE);
-	setRS(D3DRENDERSTATE_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1);
-	setRS(D3DRENDERSTATE_AMBIENTMATERIALSOURCE, D3DMCS_COLOR1);
-	setRS(D3DRENDERSTATE_EMISSIVEMATERIALSOURCE, D3DMCS_MATERIAL);
-	setRS(D3DRENDERSTATE_SPECULARMATERIALSOURCE, D3DMCS_MATERIAL);
+	setRS(D3DRS_COLORVERTEX, FALSE);
+	setRS(D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1);
+	setRS(D3DRS_AMBIENTMATERIALSOURCE, D3DMCS_COLOR1);
+	setRS(D3DRS_EMISSIVEMATERIALSOURCE, D3DMCS_MATERIAL);
+	setRS(D3DRS_SPECULARMATERIALSOURCE, D3DMCS_MATERIAL);
 
 	//Alpha test
-	setRS(D3DRENDERSTATE_ALPHATESTENABLE, false);
-	setRS(D3DRENDERSTATE_ALPHAFUNC, D3DCMP_GREATER);
-	setRS(D3DRENDERSTATE_ALPHAREF, 128);
+	setRS(D3DRS_ALPHATESTENABLE, false);
+	setRS(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
+	setRS(D3DRS_ALPHAREF, 128);
 
 	//source/dest blending modes
-	setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_SRCALPHA);
-	setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	setRS(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	setRS(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 
 	//suss out caps
 	can_wb = false;
 	hw_tex_stages = 1;
-	D3DDEVICEDESC7 devDesc = { 0 };
-	if(dir3dDev->GetCaps(&devDesc) >= 0) {
-		DWORD caps = devDesc.dpcTriCaps.dwRasterCaps;
+	D3DCAPS9 devDesc = { };
+	if(dir3dDev->GetDeviceCaps(&devDesc) >= 0) {
+		DWORD caps = devDesc.RasterCaps; // TODO: TriCaps replacement
 		//texture stages
-		hw_tex_stages = devDesc.wMaxSimultaneousTextures;
+		hw_tex_stages = devDesc.MaxSimultaneousTextures;
 		//depth buffer mode
-		if((caps & D3DPRASTERCAPS_WBUFFER) && graphics->zbuffFmt.dwRGBBitCount == 16) can_wb = true;
+		if((caps & D3DPRASTERCAPS_WBUFFER) && graphics->zbuffFmt == D3DFMT_D16) can_wb = true;
 		//fog mode
 		if((caps & D3DPRASTERCAPS_FOGTABLE) && (caps & D3DPRASTERCAPS_WFOG)) {
-			setRS(D3DRENDERSTATE_FOGVERTEXMODE, D3DFOG_NONE);
-			setRS(D3DRENDERSTATE_FOGTABLEMODE, D3DFOG_LINEAR);
+			setRS(D3DRS_FOGVERTEXMODE, D3DFOG_NONE);
+			setRS(D3DRS_FOGTABLEMODE, D3DFOG_LINEAR);
 		}
 		else {
-			setRS(D3DRENDERSTATE_FOGTABLEMODE, D3DFOG_NONE);
-			setRS(D3DRENDERSTATE_FOGVERTEXMODE, D3DFOG_LINEAR);
+			setRS(D3DRS_FOGTABLEMODE, D3DFOG_NONE);
+			setRS(D3DRS_FOGVERTEXMODE, D3DFOG_LINEAR);
 		}
 	}
 	tex_stages = hw_tex_stages;
 
 	caps_level = 100;
-	if(devDesc.dpcTriCaps.dwTextureCaps & D3DPTEXTURECAPS_CUBEMAP) {
+	if(devDesc.TextureCaps & D3DPTEXTURECAPS_CUBEMAP) { //TODO: TriCaps replacement?
 		caps_level = 110;
 	}
 
-	max_lights = devDesc.dwMaxActiveLights;
+	max_lights = devDesc.MaxActiveLights;
 
 	//default texture states
 	for(int n = 0; n < hw_tex_stages; ++n) {
@@ -83,9 +90,9 @@ gxScene::gxScene(gxGraphics* g, gxCanvas* t) :
 		setTSS(n, D3DTSS_COLORARG2, D3DTA_CURRENT);
 		setTSS(n, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
 		setTSS(n, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
-		setTSS(n, D3DTSS_MINFILTER, D3DTFN_LINEAR);
-		setTSS(n, D3DTSS_MAGFILTER, D3DTFG_LINEAR);
-		setTSS(n, D3DTSS_MIPFILTER, D3DTFP_LINEAR);
+		setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+		setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+		setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
 	}
 	setHWMultiTex(true);
 
@@ -113,7 +120,7 @@ gxScene::gxScene(gxGraphics* g, gxCanvas* t) :
 	zmode = -1; setZMode(ZMODE_NORMAL);
 	memset(&projmatrix, 0, sizeof(projmatrix));
 	ortho_proj = true; frustum_nr = frustum_fr = frustum_w = frustum_h = 0; setPerspProj(1, 1000, 1, 1);
-	memset(&viewport, 0, sizeof(viewport)); viewport.dvMaxZ = 1; setViewport(0, 0, target->getWidth(), target->getHeight());
+	memset(&viewport, 0, sizeof(viewport)); viewport.MaxZ = 1; setViewport(0, 0, target->getWidth(), target->getHeight());
 	viewmatrix = nullmatrix; setViewMatrix(0);
 	worldmatrix = nullmatrix; setWorldMatrix(0);
 
@@ -134,12 +141,28 @@ void gxScene::setTexState(int n, const TexState& state, bool tex_blend) {
 	int flags = state.canvas->getFlags();
 	int tc_index = state.flags & TEX_COORDS2 ? 1 : 0;
 
-	//set canvas
-	dir3dDev->SetTexture(n, state.canvas->getTexSurface());
+	IDirect3DSurface9* pSurface = state.canvas->getTexSurface();
+	IDirect3DBaseTexture9* pTex;
+
+	if (pSurface) {
+		HRESULT hr = pSurface->GetContainer(IID_IDirect3DBaseTexture9, (void**)&pTex);
+		if (SUCCEEDED(hr) && pTex) {
+			dir3dDev->SetTexture(n, pTex);
+			pTex->Release();
+		}
+		else {
+			// Fallback
+			dir3dDev->SetTexture(n, 0);
+		}
+	}
+	else {
+		// Fallback
+		dir3dDev->SetTexture(n, 0);
+	}
 
 	//set addressing modes
-	setTSS(n, D3DTSS_ADDRESSU, (flags & gxCanvas::CANVAS_TEX_CLAMPU) ? D3DTADDRESS_CLAMP : D3DTADDRESS_WRAP);
-	setTSS(n, D3DTSS_ADDRESSV, (flags & gxCanvas::CANVAS_TEX_CLAMPV) ? D3DTADDRESS_CLAMP : D3DTADDRESS_WRAP);
+	setSAMP(n, D3DSAMP_ADDRESSU, (flags & gxCanvas::CANVAS_TEX_CLAMPU) ? D3DTADDRESS_CLAMP : D3DTADDRESS_WRAP);
+	setSAMP(n, D3DSAMP_ADDRESSV, (flags & gxCanvas::CANVAS_TEX_CLAMPV) ? D3DTADDRESS_CLAMP : D3DTADDRESS_WRAP);
 
 	switch(flags & (
 		gxCanvas::CANVAS_TEX_POINT |
@@ -147,30 +170,30 @@ void gxScene::setTexState(int n, const TexState& state, bool tex_blend) {
 		gxCanvas::CANVAS_TEX_NOFILTER |
 		gxCanvas::CANVAS_TEX_ANISOTROPIC)) {
 		case gxCanvas::CANVAS_TEX_POINT:
-			setTSS(n, D3DTSS_MINFILTER, D3DTFN_POINT);
-			setTSS(n, D3DTSS_MAGFILTER, D3DTFG_POINT);
-			setTSS(n, D3DTSS_MIPFILTER, D3DTFP_POINT);
+			setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+			setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+			setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
 			break;
 		case gxCanvas::CANVAS_TEX_BILINEAR:
-			setTSS(n, D3DTSS_MINFILTER, D3DTFN_LINEAR);
-			setTSS(n, D3DTSS_MAGFILTER, D3DTFG_LINEAR);
-			setTSS(n, D3DTSS_MIPFILTER, D3DTFP_POINT);
+			setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+			setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+			setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
 			break;
 		case gxCanvas::CANVAS_TEX_NOFILTER:
-			setTSS(n, D3DTSS_MINFILTER, D3DTFN_POINT);
-			setTSS(n, D3DTSS_MAGFILTER, D3DTFG_POINT);
-			setTSS(n, D3DTSS_MIPFILTER, D3DTFP_NONE);
+			setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+			setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+			setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
 			break;
 		case gxCanvas::CANVAS_TEX_ANISOTROPIC:
-			setTSS(n, D3DTSS_MINFILTER, D3DTFN_ANISOTROPIC);
-			setTSS(n, D3DTSS_MAGFILTER, D3DTFG_ANISOTROPIC);
-			setTSS(n, D3DTSS_MIPFILTER, D3DTFP_LINEAR);
-			setTSS(n, D3DTSS_MAXANISOTROPY, (textureAnisotropic > 0) ? textureAnisotropic : 1);
+			setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC); //TODO: special sampler; something might be different here with this as the original 'D3DTFN_ANISOTROPIC'
+			setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
+			setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+			setSAMP(n, D3DSAMP_MAXANISOTROPY, (textureAnisotropic > 0) ? textureAnisotropic : 1);
 			break;
 		default:
-			setTSS(n, D3DTSS_MINFILTER, D3DTFN_LINEAR);
-			setTSS(n, D3DTSS_MAGFILTER, D3DTFG_LINEAR);
-			setTSS(n, D3DTSS_MIPFILTER, D3DTFP_LINEAR);
+			setSAMP(n, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+			setSAMP(n, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+			setSAMP(n, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
 	}
 
 	//texgen
@@ -181,7 +204,7 @@ void gxScene::setTexState(int n, const TexState& state, bool tex_blend) {
 		case gxCanvas::CANVAS_TEX_SPHERE:
 			setTSS(n, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACENORMAL);//|tc_index );
 			setTSS(n, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
-			dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTRANSFORMSTATE_TEXTURE0 + n), &sphere_mat);
+			dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + n), &sphere_mat);
 			break;
 		case gxCanvas::CANVAS_TEX_CUBE:
 			switch(state.canvas->cubeMode() & 3) {
@@ -200,14 +223,14 @@ void gxScene::setTexState(int n, const TexState& state, bool tex_blend) {
 			}
 			else {
 				setTSS(n, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);//COUNT4|D3DTTFF_PROJECTED );
-				dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTRANSFORMSTATE_TEXTURE0 + n), &inv_viewmatrix);
+				dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + n), &inv_viewmatrix);
 			}
 			break;
 		default:
 			setTSS(n, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | tc_index);
 			if(state.mat_valid) {
 				setTSS(n, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
-				dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTRANSFORMSTATE_TEXTURE0 + n), (D3DMATRIX*)&state.matrix);
+				dir3dDev->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + n), (D3DMATRIX*)&state.matrix);
 			}
 			else {
 				setTSS(n, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
@@ -257,16 +280,16 @@ int  gxScene::gfxDriverCaps3D() {
 void gxScene::setZMode() {
 	switch(zmode) {
 		case ZMODE_NORMAL:
-			setRS(D3DRENDERSTATE_ZENABLE, wbuffer ? D3DZB_USEW : D3DZB_TRUE);
-			setRS(D3DRENDERSTATE_ZWRITEENABLE, true);
+			setRS(D3DRS_ZENABLE, wbuffer ? D3DZB_USEW : D3DZB_TRUE);
+			setRS(D3DRS_ZWRITEENABLE, true);
 			break;
 		case ZMODE_DISABLE:
-			setRS(D3DRENDERSTATE_ZENABLE, D3DZB_FALSE);
-			setRS(D3DRENDERSTATE_ZWRITEENABLE, false);
+			setRS(D3DRS_ZENABLE, D3DZB_FALSE);
+			setRS(D3DRS_ZWRITEENABLE, false);
 			break;
 		case ZMODE_CMPONLY:
-			setRS(D3DRENDERSTATE_ZENABLE, wbuffer ? D3DZB_USEW : D3DZB_TRUE);
-			setRS(D3DRENDERSTATE_ZWRITEENABLE, false);
+			setRS(D3DRS_ZENABLE, wbuffer ? D3DZB_USEW : D3DZB_TRUE);
+			setRS(D3DRS_ZWRITEENABLE, false);
 			break;
 	}
 }
@@ -280,7 +303,7 @@ void gxScene::setLights() {
 		//some lights on
 		for(int n = 0; n < _curLights.size(); ++n) {
 			gxLight* light = _curLights[n];
-			bool enable = light->d3d_light.dltType != D3DLIGHT_DIRECTIONAL;
+			bool enable = light->d3d_light.Type != D3DLIGHT_DIRECTIONAL;
 			dir3dDev->LightEnable(n, enable);
 		}
 	}
@@ -292,42 +315,42 @@ void gxScene::setLights() {
 
 void gxScene::setAmbient() {
 	int n = (fx & FX_FULLBRIGHT) ? 0xffffff : ((fx & FX_CONDLIGHT) ? ambient2 : ambient);
-	setRS(D3DRENDERSTATE_AMBIENT, n);
+	setRS(D3DRS_AMBIENT, n);
 }
 
 void gxScene::setFogMode() {
 	if(!!(fx & FX_NOFOG)) {
-		setRS(D3DRENDERSTATE_FOGENABLE, false);
+		setRS(D3DRS_FOGENABLE, false);
 		return;
 	}
 	switch(fogmode) {
 		case FOG_NONE:
-			setRS(D3DRENDERSTATE_FOGENABLE, false);
+			setRS(D3DRS_FOGENABLE, false);
 			break;
 		case FOG_EXP:
-			setRS(D3DRENDERSTATE_FOGENABLE, true);
-			setRS(D3DRENDERSTATE_FOGTABLEMODE, D3DFOG_EXP);
+			setRS(D3DRS_FOGENABLE, true);
+			setRS(D3DRS_FOGTABLEMODE, D3DFOG_EXP);
 			break;
 		case FOG_EXP2:
-			setRS(D3DRENDERSTATE_FOGENABLE, true);
-			setRS(D3DRENDERSTATE_FOGTABLEMODE, D3DFOG_EXP2);
+			setRS(D3DRS_FOGENABLE, true);
+			setRS(D3DRS_FOGTABLEMODE, D3DFOG_EXP2);
 			break;
 		case FOG_LINEAR:
-			setRS(D3DRENDERSTATE_FOGENABLE, true);
-			setRS(D3DRENDERSTATE_FOGTABLEMODE, D3DFOG_LINEAR);
+			setRS(D3DRS_FOGENABLE, true);
+			setRS(D3DRS_FOGTABLEMODE, D3DFOG_LINEAR);
 			break;
 	}
 }
 
 void gxScene::setTriCull() {
 	if(fx & FX_DOUBLESIDED) {
-		setRS(D3DRENDERSTATE_CULLMODE, D3DCULL_NONE);
+		setRS(D3DRS_CULLMODE, D3DCULL_NONE);
 	}
 	else if(flipped) {
-		setRS(D3DRENDERSTATE_CULLMODE, D3DCULL_CW);
+		setRS(D3DRS_CULLMODE, D3DCULL_CW);
 	}
 	else {
-		setRS(D3DRENDERSTATE_CULLMODE, D3DCULL_CCW);
+		setRS(D3DRS_CULLMODE, D3DCULL_CCW);
 	}
 }
 
@@ -351,12 +374,14 @@ void gxScene::setWBuffer(bool n) {
 
 void gxScene::setDither(bool n) {
 	if(n == dither) return;
-	dither = n; setRS(D3DRENDERSTATE_DITHERENABLE, dither ? true : false);
+	dither = n; setRS(D3DRS_DITHERENABLE, dither ? true : false);
 }
 
+// TODO: DX7 ANTIALIAS is likely superceded with MULTISAMPLEANTIALIAS. Will need to verify with that if it is the case.
+// Fix: Replaced with True or False to apply the Antialias to render state.
 void gxScene::setAntialias(bool n) {
 	if(n == antialias) return;
-	antialias = n; setRS(D3DRENDERSTATE_ANTIALIAS, antialias ? D3DANTIALIAS_SORTINDEPENDENT : D3DANTIALIAS_NONE);
+	antialias = n; setRS(D3DRS_MULTISAMPLEANTIALIAS, antialias ? TRUE : FALSE);
 }
 
 void gxScene::setWireframe(bool n) {
@@ -380,8 +405,8 @@ void gxScene::setAmbient2(const float rgb[]) {
 }
 
 void gxScene::setViewport(int x, int y, int w, int h) {
-	if(x == viewport.dwX && y == viewport.dwY && w == viewport.dwWidth && h == viewport.dwHeight) return;
-	viewport.dwX = x; viewport.dwY = y; viewport.dwWidth = w; viewport.dwHeight = h;
+	if(x == viewport.X && y == viewport.Y && w == viewport.Width && h == viewport.Height) return;
+	viewport.X = x; viewport.Y = y; viewport.Width = w; viewport.Height = h;
 	dir3dDev->SetViewport(&viewport);
 }
 
@@ -397,7 +422,7 @@ void gxScene::setOrthoProj(float nr, float fr, float w, float h) {
 	projmatrix._34 = 0;
 	projmatrix._43 = -Q * nr;
 	projmatrix._44 = 1;
-	dir3dDev->SetTransform(D3DTRANSFORMSTATE_PROJECTION, &projmatrix);
+	dir3dDev->SetTransform(D3DTS_PROJECTION, &projmatrix);
 }
 
 void gxScene::setPerspProj(float nr, float fr, float w, float h) {
@@ -412,26 +437,26 @@ void gxScene::setPerspProj(float nr, float fr, float w, float h) {
 	projmatrix._34 = 1;
 	projmatrix._43 = -Q * nr;
 	projmatrix._44 = 0;
-	dir3dDev->SetTransform(D3DTRANSFORMSTATE_PROJECTION, &projmatrix);
+	dir3dDev->SetTransform(D3DTS_PROJECTION, &projmatrix);
 }
 
 void gxScene::setFogColor(const float rgb[3]) {
 	int n = (int(rgb[0] * 255.0f) << 16) | (int(rgb[1] * 255.0f) << 8) | int(rgb[2] * 255.0f);
 	if(n == fogcolor) return;
-	fogcolor = n; setRS(D3DRENDERSTATE_FOGCOLOR, fogcolor);
+	fogcolor = n; setRS(D3DRS_FOGCOLOR, fogcolor);
 }
 
 void gxScene::setFogRange(float nr, float fr) {
 	if(nr == fogrange_nr && fr == fogrange_fr) return;
 	fogrange_nr = nr; fogrange_fr = fr;
-	setRS(D3DRENDERSTATE_FOGSTART, *(DWORD*)&fogrange_nr);
-	setRS(D3DRENDERSTATE_FOGEND, *(DWORD*)&fogrange_fr);
+	setRS(D3DRS_FOGSTART, *(DWORD*)&fogrange_nr);
+	setRS(D3DRS_FOGEND, *(DWORD*)&fogrange_fr);
 }
 
 void gxScene::setFogDensity(float den) {
 	if(den == fog_density) return;
 	fog_density = den;
-	setRS(D3DRENDERSTATE_FOGDENSITY, *(DWORD*)&fog_density);
+	setRS(D3DRS_FOGDENSITY, *(DWORD*)&fog_density);
 }
 
 void gxScene::setFogMode(int n) {
@@ -459,7 +484,7 @@ void gxScene::setViewMatrix(const Matrix* m) {
 		viewmatrix = inv_viewmatrix = nullmatrix;
 	}
 
-	dir3dDev->SetTransform(D3DTRANSFORMSTATE_VIEW, &viewmatrix);
+	dir3dDev->SetTransform(D3DTS_VIEW, &viewmatrix);
 }
 
 void gxScene::setWorldMatrix(const Matrix* m) {
@@ -470,52 +495,52 @@ void gxScene::setWorldMatrix(const Matrix* m) {
 		memcpy(&worldmatrix._41, m->elements[3], 12);
 	}
 	else worldmatrix = nullmatrix;
-	dir3dDev->SetTransform(D3DTRANSFORMSTATE_WORLD, &worldmatrix);
+	dir3dDev->SetTransform(D3DTS_WORLD, &worldmatrix);
 }
 
 void gxScene::setRenderState(const RenderState& rs) {
 	bool setmat = false;
-	if(memcmp(rs.color, &material.diffuse.r, 12)) {
-		memcpy(&material.diffuse.r, rs.color, 12);
-		memcpy(&material.ambient.r, rs.color, 12);
+	if(memcmp(rs.color, &material.Diffuse.r, 12)) {
+		memcpy(&material.Diffuse.r, rs.color, 12);
+		memcpy(&material.Ambient.r, rs.color, 12);
 		setmat = true;
 	}
-	if(rs.alpha != material.diffuse.a) {
-		material.diffuse.a = rs.alpha;
+	if(rs.alpha != material.Diffuse.a) {
+		material.Diffuse.a = rs.alpha;
 		if(rs.fx & FX_ALPHATEST) {
 			int alpharef = (rs.fx & FX_VERTEXALPHA) ? 0 : 128 * rs.alpha;
-			setRS(D3DRENDERSTATE_ALPHAREF, alpharef);
+			setRS(D3DRS_ALPHAREF, alpharef);
 		}
 		setmat = true;
 	}
 	if(rs.shininess != shininess) {
 		shininess = rs.shininess;
 		float t = shininess > 0 ? (shininess < 1 ? shininess : 1) : 0;
-		material.specular.r = material.specular.g = material.specular.b = t;
-		material.power = shininess * 128;
-		setRS(D3DRENDERSTATE_SPECULARENABLE, shininess > 0 ? true : false);
+		material.Specular.r = material.Specular.g = material.Specular.b = t;
+		material.Power = shininess * 128;
+		setRS(D3DRS_SPECULARENABLE, shininess > 0 ? true : false);
 		setmat = true;
 	}
 	if(rs.blend != blend) {
 		blend = rs.blend;
 		switch(blend) {
 			case BLEND_REPLACE:
-				setRS(D3DRENDERSTATE_ALPHABLENDENABLE, false);
+				setRS(D3DRS_ALPHABLENDENABLE, false);
 				break;
 			case BLEND_ALPHA:
-				setRS(D3DRENDERSTATE_ALPHABLENDENABLE, true);
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_SRCALPHA);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_INVSRCALPHA);
+				setRS(D3DRS_ALPHABLENDENABLE, true);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 				break;
 			case BLEND_MULTIPLY:
-				setRS(D3DRENDERSTATE_ALPHABLENDENABLE, true);
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_DESTCOLOR);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_ZERO);
+				setRS(D3DRS_ALPHABLENDENABLE, true);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_ZERO);
 				break;
 			case BLEND_ADD:
-				setRS(D3DRENDERSTATE_ALPHABLENDENABLE, true);
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_SRCALPHA);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_ONE);
+				setRS(D3DRS_ALPHABLENDENABLE, true);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_ONE);
 				break;
 		}
 	}
@@ -526,10 +551,10 @@ void gxScene::setRenderState(const RenderState& rs) {
 			setAmbient();
 		}
 		if(t & FX_VERTEXCOLOR) {
-			setRS(D3DRENDERSTATE_COLORVERTEX, fx & FX_VERTEXCOLOR ? true : false);
+			setRS(D3DRS_COLORVERTEX, fx & FX_VERTEXCOLOR ? true : false);
 		}
 		if(t & FX_FLATSHADED) {
-			setRS(D3DRENDERSTATE_SHADEMODE, fx & FX_FLATSHADED ? D3DSHADE_FLAT : D3DSHADE_GOURAUD);
+			setRS(D3DRS_SHADEMODE, fx & FX_FLATSHADED ? D3DSHADE_FLAT : D3DSHADE_GOURAUD);
 		}
 		if(t & FX_NOFOG) {
 			setFogMode();
@@ -538,22 +563,22 @@ void gxScene::setRenderState(const RenderState& rs) {
 			setTriCull();
 		}
 		if(!wireframe && t & FX_WIREFRAME) {
-			setRS(D3DRENDERSTATE_FILLMODE, fx & FX_WIREFRAME ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
+			setRS(D3DRS_FILLMODE, fx & FX_WIREFRAME ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
 		}
 		if(t & FX_EMISSIVE) {
 			//Q3 Hack!
 			int n = fx & FX_EMISSIVE;
-			setRS(D3DRENDERSTATE_DIFFUSEMATERIALSOURCE, n ? D3DMCS_MATERIAL : D3DMCS_COLOR1);
-			setRS(D3DRENDERSTATE_AMBIENTMATERIALSOURCE, n ? D3DMCS_MATERIAL : D3DMCS_COLOR1);
-			setRS(D3DRENDERSTATE_EMISSIVEMATERIALSOURCE, n ? D3DMCS_COLOR1 : D3DMCS_MATERIAL);
-			setRS(D3DRENDERSTATE_COLORVERTEX, n ? true : false);
+			setRS(D3DRS_DIFFUSEMATERIALSOURCE, n ? D3DMCS_MATERIAL : D3DMCS_COLOR1);
+			setRS(D3DRS_AMBIENTMATERIALSOURCE, n ? D3DMCS_MATERIAL : D3DMCS_COLOR1);
+			setRS(D3DRS_EMISSIVEMATERIALSOURCE, n ? D3DMCS_COLOR1 : D3DMCS_MATERIAL);
+			setRS(D3DRS_COLORVERTEX, n ? true : false);
 		}
 		if(t & FX_ALPHATEST) {
 			if(fx & FX_ALPHATEST) {
 				int alpharef = (rs.fx & FX_VERTEXALPHA) ? 0 : 128 * rs.alpha;
-				setRS(D3DRENDERSTATE_ALPHAREF, alpharef);
+				setRS(D3DRS_ALPHAREF, alpharef);
 			}
-			setRS(D3DRENDERSTATE_ALPHATESTENABLE, fx & FX_ALPHATEST ? true : false);
+			setRS(D3DRS_ALPHATESTENABLE, fx & FX_ALPHATEST ? true : false);
 		}
 	}
 	if(setmat) {
@@ -613,7 +638,7 @@ bool gxScene::begin(const std::vector<gxLight*>& lights) {
 		setTSS(n, D3DTSS_COLOROP, D3DTOP_DISABLE);
 		setTSS(n, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 		dir3dDev->SetTexture(n, 0);
-		setTSS(n, D3DTSS_MIPMAPLODBIAS, textureLodBias);
+		setSAMP(n, D3DSAMP_MIPMAPLODBIAS, textureLodBias);
 	}
 
 	//set light states
@@ -629,7 +654,7 @@ bool gxScene::begin(const std::vector<gxLight*>& lights) {
 	}
 	setLights();
 
-	setRS(D3DRENDERSTATE_FILLMODE, wireframe ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
+	setRS(D3DRS_FILLMODE, wireframe ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
 
 	return true;
 }
@@ -654,23 +679,23 @@ void gxScene::render(gxMesh* m, int first_vert, int vert_cnt, int first_tri, int
 		setTSS(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 	}
 
-	setRS(D3DRENDERSTATE_LIGHTING, false);
-	setRS(D3DRENDERSTATE_ALPHABLENDENABLE, true);
+	setRS(D3DRS_LIGHTING, false);
+	setRS(D3DRS_ALPHABLENDENABLE, true);
 
 	for(int k = tex_stages; k < n_texs; ++k) {
 		const TexState& state = texstate[k];
 		switch(state.blend) {
 			case BLEND_ALPHA:
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_SRCALPHA);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_INVSRCALPHA);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 				break;
 			case BLEND_MULTIPLY:case BLEND_DOT3:
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_DESTCOLOR);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_ZERO);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_ZERO);
 				break;
 			case BLEND_ADD:
-				setRS(D3DRENDERSTATE_SRCBLEND, D3DBLEND_ONE);
-				setRS(D3DRENDERSTATE_DESTBLEND, D3DBLEND_ONE);
+				setRS(D3DRS_SRCBLEND, D3DBLEND_ONE);
+				setRS(D3DRS_DESTBLEND, D3DBLEND_ONE);
 				break;
 		}
 		setTexState(0, state, false);
@@ -678,15 +703,15 @@ void gxScene::render(gxMesh* m, int first_vert, int vert_cnt, int first_tri, int
 		tris_drawn += tri_cnt;
 	}
 
-	setRS(D3DRENDERSTATE_ALPHABLENDENABLE, false);
-	setRS(D3DRENDERSTATE_LIGHTING, true);
+	setRS(D3DRS_ALPHABLENDENABLE, false);
+	setRS(D3DRS_LIGHTING, true);
 	if(tex_stages > 1) setTexState(1, texstate[1], true);
 	setTexState(0, texstate[0], true);
 }
 
 void gxScene::end() {
 	dir3dDev->EndScene();
-	RECT r = { viewport.dwX,viewport.dwY,viewport.dwX + viewport.dwWidth,viewport.dwY + viewport.dwHeight };
+	RECT r = { viewport.X,viewport.Y,viewport.X + viewport.Width,viewport.Y + viewport.Height };
 	target->damage(r);
 }
 

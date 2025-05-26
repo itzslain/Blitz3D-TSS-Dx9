@@ -1,10 +1,10 @@
 #ifndef DDUTIL_H
 #define DDUTIL_H
 
-#include <ddraw.h>
+//#include <ddraw.h>
 
 class gxGraphics;
-typedef IDirectDrawSurface7 ddSurf;
+typedef IDirect3DSurface9 ddSurf;
 
 struct ddUtil {
 
@@ -29,13 +29,15 @@ public:
 	PixelFormat() :plot_code(0) {
 	}
 
-	PixelFormat(const DDPIXELFORMAT& pf) :plot_code(0) {
+	// TODO: Format must follow at least this guide:
+	// https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide#common-dds-file-resource-formats-and-associated-header-content
+	PixelFormat(const D3DFORMAT& pf) :plot_code(0) {
 		setFormat(pf);
 	}
 
 	~PixelFormat();
 
-	void setFormat(const DDPIXELFORMAT& pf);
+	void setFormat(const D3DFORMAT& pf);
 
 	int getDepth()const {
 		return depth;

@@ -19,8 +19,10 @@ private:
 	enum {
 		QUE_SIZE = 32, QUE_MASK = QUE_SIZE - 1
 	};
-	int hit_count[256];			//how many hits of key
-	bool down_state[256];			//time key went down
+public:
+	int hit_count[256 + 8];			//how many hits of key
+	bool down_state[256 + 8];			//time key went down
+private:
 	int que[QUE_SIZE], put, get;
 
 	/***** GX INTERFACE *****/
