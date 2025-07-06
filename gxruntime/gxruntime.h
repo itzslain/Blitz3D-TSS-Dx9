@@ -53,7 +53,7 @@ private:
 	std::string app_title;
 	std::string app_close;
 
-	bool setDisplayMode(int w, int h, int d, bool d3d, IDirectDraw7* dd);
+	bool setDisplayMode(int w, int h, int d, bool d3d, IDirect3DSurface9* dd);
 	gxGraphics* openWindowedGraphics(int w, int h, int d, bool d3d);
 	gxGraphics* openExclusiveGraphics(int w, int h, int d, bool d3d);
 
