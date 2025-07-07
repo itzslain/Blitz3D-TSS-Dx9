@@ -77,11 +77,13 @@ public:
 	//SPECIAL!
 	void copy(gxCanvas* dest, int dx, int dy, int dw, int dh, gxCanvas* src, int sx, int sy, int sw, int sh);
 
+	/*
+	removed gamma
 	//NEW! Gamma control!
 	void setGamma(int r, int g, int b, float dr, float dg, float db);
 	void getGamma(int r, int g, int b, float* dr, float* dg, float* db);
 	void updateGamma(bool calibrate);
-
+*/
 	//ACCESSORS
 	int getWidth()const;
 	int getHeight()const;
