@@ -75,22 +75,8 @@ gxGraphics::~gxGraphics() {
 	dirDraw->Release();
 }
 
-void gxGraphics::setGamma(int r, int g, int b, float dr, float dg, float db) {
-	_gammaRamp.red[r & 255] = dr * 257.0f;
-	_gammaRamp.green[g & 255] = dg * 257.0f;
-	_gammaRamp.blue[b & 255] = db * 257.0f;
-}
 
-void gxGraphics::updateGamma(bool calibrate) {
-	if (!_gamma) return;
-	_gamma->SetGammaRamp(calibrate ? D3DSGR_CALIBRATE : D3DSGR_NO_CALIBRATION, &_gammaRamp);
-}
 
-void gxGraphics::getGamma(int r, int g, int b, float* dr, float* dg, float* db) {
-	*dr = _gammaRamp.red[r & 255] / 257.0f;
-	*dg = _gammaRamp.green[g & 255] / 257.0f;
-	*db = _gammaRamp.blue[b & 255] / 257.0f;
-}
 
 bool gxGraphics::restore() {
 

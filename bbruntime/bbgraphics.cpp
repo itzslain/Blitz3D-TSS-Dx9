@@ -490,7 +490,8 @@ int bbDesktopHeight()
 {
     return gx_runtime->desktopHeight();
 }
-
+/*
+//FIXME
 void  bbSetGamma(int r, int g, int b, float dr, float dg, float db)
 {
     if (dr < 0) dr = 0;
@@ -501,32 +502,32 @@ void  bbSetGamma(int r, int g, int b, float dr, float dg, float db)
     else if (db > 255.0f) db = 255.0f;
     gx_graphics->setGamma(r, g, b, dr, dg, db);
 }
-
+//FIXME
 void  bbUpdateGamma(int calibrate)
 {
     gx_graphics->updateGamma(!!calibrate);
 }
-
+//FIXME
 float  bbGammaRed(int n)
 {
     float dr, dg, db;
     gx_graphics->getGamma(n, n, n, &dr, &dg, &db);
     return dr;
 }
-
+//FIXME
 float  bbGammaGreen(int n)
 {
     float dr, dg, db;
     gx_graphics->getGamma(n, n, n, &dr, &dg, &db);
     return dg;
 }
-
+//FIXME
 float  bbGammaBlue(int n)
 {
     float dr, dg, db;
     gx_graphics->getGamma(n, n, n, &dr, &dg, &db);
     return db;
-}
+}*/
 
 gxCanvas* bbFrontBuffer()
 {

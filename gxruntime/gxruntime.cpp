@@ -51,7 +51,7 @@ static bool auto_suspend;
 //for modes 1 and 2
 static int mod_cnt;
 static MMRESULT timerID;
-static IDirectDrawClipper* clipper;
+//static IDirectDrawClipper* clipper;
 static IDirect3DSurface9* primSurf;
 static Debugger* debugger;
 
@@ -82,7 +82,8 @@ gxRuntime* gxRuntime::openRuntime(HINSTANCE hinst, const std::string& cmd_line, 
 	RegisterClass(&wndclass);
 
 	gfx_mode = GMODE_NONE;
-	clipper = 0; primSurf = 0;
+	//clipper = 0;
+	 primSurf = 0;
 	busy = suspended = false;
 	run_flag = true;
 
@@ -814,6 +815,7 @@ gxGraphics* gxRuntime::openWindowedGraphics(int w, int h, int d, bool d3d) {
 		if(dd->CreateSurface(&desc, &ps, 0) >= 0) {
 			//create clipper
 			// TODO: add D3DXMATRIX 
+			// FIXME Clipper not valid
 			IDirectDrawClipper* cp;
 			if(dd->CreateClipper(0, &cp, 0) >= 0) {
 				//attach clipper
@@ -1073,7 +1075,7 @@ static BOOL WINAPI enumDriver(GUID FAR* guid, LPSTR desc, LPSTR name, LPVOID con
 	d->name = desc;
 
 	memset(&d->d3d_desc, 0, sizeof(d->d3d_desc));
-	IDirect3D7* dir3d;
+	IDirect3D9* dir3d;
 	if(dd->QueryInterface(IID_IDirect3D7, (void**)&dir3d) >= 0) {
 		maxDevType = 0;
 		dir3d->EnumDevices(enumDevice, d);

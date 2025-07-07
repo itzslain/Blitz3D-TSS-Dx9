@@ -21,8 +21,9 @@ private:
 	RECT src_rect;
 	gxGraphics* gfx;
 	gxCanvas* canvas;
-	IDirectDrawSurface* dd_surf;
+	IDirect3DSurface9* dd_surf;
 	IMediaStream* vid_stream;
+	// FIXME
 	IDirectDrawMediaStream* dd_stream;
 	IDirectDrawStreamSample* dd_sample;
 	IMultiMediaStream* mm_stream;
