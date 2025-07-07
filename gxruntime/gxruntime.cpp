@@ -12,7 +12,7 @@ struct gxRuntime::GfxDriver {
 	GUID* guid;
 	std::string name;
 	std::vector<GfxMode*> modes;
-	D3DDEVICEDESC7 d3d_desc;
+	D3DDEVICEDESC9 d3d_desc;
 };
 
 static const int static_ws = WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
@@ -52,7 +52,7 @@ static bool auto_suspend;
 static int mod_cnt;
 static MMRESULT timerID;
 static IDirectDrawClipper* clipper;
-static IDirectDrawSurface7* primSurf;
+static IDirect3DSurface9* primSurf;
 static Debugger* debugger;
 
 static std::set<gxTimer*> timers;
@@ -765,7 +765,7 @@ void gxRuntime::restoreWindowState() {
 		SWP_NOZORDER | SWP_FRAMECHANGED);
 }
 
-bool gxRuntime::setDisplayMode(int w, int h, int d, bool d3d, IDirectDraw7* dirDraw) {
+bool gxRuntime::setDisplayMode(int w, int h, int d, bool d3d, IDirect3D9* dirDraw) {
 
 	if(d) return dirDraw->SetDisplayMode(w, h, d, 0, 0) >= 0;
 
@@ -801,18 +801,19 @@ bool gxRuntime::setDisplayMode(int w, int h, int d, bool d3d, IDirectDraw7* dirD
 
 gxGraphics* gxRuntime::openWindowedGraphics(int w, int h, int d, bool d3d) {
 
-	IDirectDraw7* dd;
+	IDirect3D9* dd;
 	if(DirectDrawCreateEx(curr_driver->guid, (void**)&dd, IID_IDirectDraw7, 0) < 0) return 0;
 
 	//set coop level
 	if(dd->SetCooperativeLevel(hwnd, DDSCL_NORMAL) >= 0) {
 		//create primary surface
-		IDirectDrawSurface7* ps;
+		IDirect3D9Surface9* ps;
 		DDSURFACEDESC2 desc = { sizeof(desc) };
 		desc.dwFlags = DDSD_CAPS;
 		desc.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
 		if(dd->CreateSurface(&desc, &ps, 0) >= 0) {
 			//create clipper
+			// TODO: add D3DXMATRIX 
 			IDirectDrawClipper* cp;
 			if(dd->CreateClipper(0, &cp, 0) >= 0) {
 				//attach clipper
@@ -820,7 +821,7 @@ gxGraphics* gxRuntime::openWindowedGraphics(int w, int h, int d, bool d3d) {
 					//set clipper HWND
 					if(cp->SetHWnd(0, hwnd) >= 0) {
 						//create front buffer
-						IDirectDrawSurface7* fs;
+						IDirect3DTexture9* fs;
 						DDSURFACEDESC2 desc = { sizeof(desc) };
 						desc.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_CAPS;
 						desc.dwWidth = w; desc.dwHeight = h;
@@ -852,7 +853,7 @@ gxGraphics* gxRuntime::openWindowedGraphics(int w, int h, int d, bool d3d) {
 
 gxGraphics* gxRuntime::openExclusiveGraphics(int w, int h, int d, bool d3d) {
 
-	IDirectDraw7* dd;
+	IDirect3D9* dd;
 	if(DirectDrawCreateEx(curr_driver->guid, (void**)&dd, IID_IDirectDraw7, 0) < 0) return 0;
 
 	//Set coop level
@@ -860,7 +861,7 @@ gxGraphics* gxRuntime::openExclusiveGraphics(int w, int h, int d, bool d3d) {
 		//Set display mode
 		if(setDisplayMode(w, h, d, d3d, dd)) {
 			//create primary surface
-			IDirectDrawSurface7* ps;
+			IDirect3DSurface9* ps;
 			DDSURFACEDESC2 desc = { sizeof(desc) };
 			desc.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
 			desc.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE | DDSCAPS_COMPLEX | DDSCAPS_FLIP;
@@ -870,7 +871,7 @@ gxGraphics* gxRuntime::openExclusiveGraphics(int w, int h, int d, bool d3d) {
 
 			if(dd->CreateSurface(&desc, &ps, 0) >= 0) {
 				//find back surface
-				IDirectDrawSurface7* bs;
+				IDirect3DSurface9* bs;
 				DDSCAPS2 caps = { sizeof caps };
 				caps.dwCaps = DDSCAPS_BACKBUFFER;
 				if(ps->GetAttachedSurface(&caps, &bs) >= 0) {
@@ -1043,7 +1044,7 @@ static HRESULT WINAPI enumMode(DDSURFACEDESC2* desc, void* context) {
 }
 
 static int maxDevType;
-static HRESULT CALLBACK enumDevice(char* desc, char* name, D3DDEVICEDESC7* devDesc, void* context) {
+static HRESULT CALLBACK enumDevice(char* desc, char* name, D3DDEVICEDESC9* devDesc, void* context) {
 	int t = 0;
 	GUID guid = devDesc->deviceGUID;
 	if(guid == IID_IDirect3DRGBDevice) t = 1;
@@ -1058,7 +1059,7 @@ static HRESULT CALLBACK enumDevice(char* desc, char* name, D3DDEVICEDESC7* devDe
 }
 
 static BOOL WINAPI enumDriver(GUID FAR* guid, LPSTR desc, LPSTR name, LPVOID context, HMONITOR hm) {
-	IDirectDraw7* dd;
+	IDirect3D9* dd;
 	if(DirectDrawCreateEx(guid, (void**)&dd, IID_IDirectDraw7, 0) < 0) return 0;
 
 	if(!guid && !desktop_desc.ddpfPixelFormat.dwRGBBitCount) {

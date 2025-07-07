@@ -21,7 +21,7 @@ class gxRuntime;
 class gxGraphics {
 public:
 	IDirect3D9* dirDraw;
-	IDirectDraw* ds_dirDraw;
+	IDirect3D9* ds_dirDraw;
 
 	IDirect3D9* dir3d;
 	IDirect3DDevice9* dir3dDev;
